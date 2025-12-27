@@ -14,18 +14,16 @@ export default function Hero() {
             </h1>
             
             <p className="text-base text-gray-600 leading-relaxed">
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Placeat voluptatem ipsam eius?Lorem, ipsum dolor sit amet consectetur adipisicing elit. Voluptas fugiat obcaecati perferendis aut odio dolor.
+              Lorem ipsum dolor sit amet consectetur adipisicing elit. Placeat voluptatem ipsam eius? Lorem, ipsum dolor sit amet consectetur adipisicing elit. Voluptas fugiat obcaecati perferendis aut odio dolor.
             </p>
             
             <div className="flex items-center gap-4 pt-2">
               <button className="px-6 py-2.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors">
                 Read more
               </button>
-             
             </div>
           </div>
           
-         
           <div className="flex justify-center lg:justify-end">
             <div className="w-full max-w-[720px] aspect-[6/5] bg-gray-100 rounded-lg flex items-center justify-center relative overflow-hidden">
               <Image

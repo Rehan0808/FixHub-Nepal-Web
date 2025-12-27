@@ -28,13 +28,9 @@ export default function LoginForm() {
 
   function onSubmit(data: any) {
     console.log(data);
-    loginUser();  // Set login state
-    
-    // Use router.replace instead of push to trigger a full re-render
-    router.replace("/");
-    
-    // Force a page reload to ensure navbar updates
-    // Alternatively, you can use window.location.href = "/" for a full reload
+    loginUser(); // Set login state
+
+    // Force reload to update navbar and navigate to home
     window.location.href = "/";
   }
 
@@ -50,8 +46,17 @@ export default function LoginForm() {
           <h1 className="text-3xl font-semibold mb-6">Welcome Back</h1>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input label="Email" register={register("email")} error={errors.email?.message as string} />
-            <Input label="Password" type="password" register={register("password")} error={errors.password?.message as string} />
+            <Input 
+              label="Email" 
+              register={register("email")} 
+              error={errors.email?.message as string} 
+            />
+            <Input 
+              label="Password" 
+              type="password" 
+              register={register("password")} 
+              error={errors.password?.message as string} 
+            />
             <Button text="Sign In" />
           </form>
 
