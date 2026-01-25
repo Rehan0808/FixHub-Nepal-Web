@@ -1,12 +1,23 @@
-export const loginUser = () => {
-  localStorage.setItem("loggedIn", "true");
-};
+import api from "./axios";
 
-export const logoutUser = () => {
-  localStorage.removeItem("loggedIn");
-};
+// Login user (call backend)
+export const loginUser = (data: any) => api.post("/auth/login", data);
 
+// Register user (call backend)
+export const registerUser = (data: any) => api.post("/auth/register", data);
+
+// ✅ Check if user is logged in (UI-only flag)
 export const isLoggedIn = () => {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("loggedIn") === "true";
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("isLoggedIn") === "true";
+  }
+  return false;
+};
+
+// ✅ Logout user
+export const logoutUser = () => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("isLoggedIn"); // UI flag
+    window.location.href = "/login";
+  }
 };

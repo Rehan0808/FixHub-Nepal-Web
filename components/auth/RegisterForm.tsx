@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema } from "@/schemas/registerSchema";
 import { useRouter } from "next/navigation";
+import { registerUser } from "@/lib/auth";
 import Input from "../ui/Input";
 import Button from "../ui/Button";
 import Image from "next/image";
@@ -20,10 +21,14 @@ export default function RegisterForm() {
     resolver: zodResolver(registerSchema),
   });
 
-  function onSubmit(data: any) {
-    console.log(data);
-    router.push("/login"); 
-  }
+  const onSubmit = async (data: any) => {
+    try {
+      await registerUser(data); // ✅ backend call
+      router.push("/login");
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Registration failed");
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 text-black">
@@ -64,7 +69,12 @@ export default function RegisterForm() {
         </div>
 
         <div className="w-1/2 hidden md:block relative">
-          <Image src="/images/login.png" alt="Register" fill className="object-cover" />
+          <Image
+            src="/images/login.png"
+            alt="Register"
+            fill
+            className="object-cover"
+          />
         </div>
       </div>
     </div>
