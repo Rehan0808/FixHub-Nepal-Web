@@ -26,13 +26,18 @@ export default function LoginForm() {
     resolver: zodResolver(loginSchema),
   });
 
-  function onSubmit(data: any) {
-    console.log(data);
-    loginUser(); // Set login state
+  const onSubmit = async (data: any) => {
+    try {
+      await loginUser(data); // backend sets httpOnly cookie
 
-    // Force reload to update navbar and navigate to home
-    window.location.href = "/";
-  }
+      // ✅ SET UI LOGIN STATE
+      localStorage.setItem("isLoggedIn", "true");
+
+      router.push("/"); // redirect to home
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Login failed");
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 text-black">
@@ -46,16 +51,16 @@ export default function LoginForm() {
           <h1 className="text-3xl font-semibold mb-6">Welcome Back</h1>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input 
-              label="Email" 
-              register={register("email")} 
-              error={errors.email?.message as string} 
+            <Input
+              label="Email"
+              register={register("email")}
+              error={errors.email?.message as string}
             />
-            <Input 
-              label="Password" 
-              type="password" 
-              register={register("password")} 
-              error={errors.password?.message as string} 
+            <Input
+              label="Password"
+              type="password"
+              register={register("password")}
+              error={errors.password?.message as string}
             />
             <Button text="Sign In" />
           </form>
@@ -69,7 +74,12 @@ export default function LoginForm() {
         </div>
 
         <div className="w-1/2 hidden md:block relative">
-          <Image src="/images/login.png" alt="Login" fill className="object-cover" />
+          <Image
+            src="/images/login.png"
+            alt="Login"
+            fill
+            className="object-cover"
+          />
         </div>
       </div>
     </div>
