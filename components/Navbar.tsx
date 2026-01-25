@@ -13,7 +13,7 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check login status on mount and whenever the pathname changes
+  
   useEffect(() => {
     setLoggedIn(isLoggedIn());
   }, [pathname]);
