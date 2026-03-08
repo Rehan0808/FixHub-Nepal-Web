@@ -14,12 +14,14 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  BadgeDollarSign,
 } from "lucide-react";
 import { useState } from "react";
 
 const userLinks = [
   { href: "/user/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/user/bookings", label: "My Bookings", icon: Calendar },
+  { href: "/user/payments", label: "My Payments", icon: BadgeDollarSign },
   { href: "/user/services", label: "Services", icon: Wrench },
   { href: "/user/chat", label: "Chat", icon: MessageSquare },
   { href: "/user/profile", label: "Profile", icon: User },

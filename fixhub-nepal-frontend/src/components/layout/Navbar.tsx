@@ -3,13 +3,50 @@
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
-import { Menu, X, Wrench, User, LogOut, LayoutDashboard, ChevronDown, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
+import api from "@/lib/api";
+import { useSocket } from "@/lib/useSocket";
+import { Menu, X, Wrench, User, LogOut, LayoutDashboard, ChevronDown } from "lucide-react";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const socket = useSocket(user?._id || user?.id || user?.email);
+  // Fetch notifications
+  useEffect(() => {
+    if (!user) return;
+    api.get("/notifications").then(res => {
+      setNotifications(res.data.data || []);
+      setUnreadCount((res.data.data || []).filter((n: any) => !n.read).length);
+    });
+  }, [user]);
+
+  // Listen for real-time notifications
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("notification", (notif: any) => {
+      setNotifications(prev => [notif, ...prev]);
+      setUnreadCount(prev => prev + 1);
+    });
+    return () => {
+      socket.off("notification");
+    };
+  }, [socket]);
+
+  // Mark all as read when opening dropdown
+  const handleNotifOpen = async () => {
+    setNotifOpen(!notifOpen);
+    if (!notifOpen && unreadCount > 0) {
+      await api.put("/notifications/read-all");
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -60,9 +97,27 @@ export default function Navbar() {
           <div className="flex items-center gap-4">
             {user ? (
               <div className="relative flex items-center gap-4">
-                <button className="p-2 text-gray-400 hover:text-primary transition-colors">
-                   <Bell className="h-5 w-5" />
-                </button>
+                <div className="relative">
+                  <button className="p-2 text-gray-400 hover:text-primary transition-colors" onClick={handleNotifOpen}>
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">{unreadCount}</span>
+                    )}
+                  </button>
+                  {notifOpen && (
+                    <div className="absolute right-0 top-10 w-80 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2 animate-fade-in z-50 max-h-96 overflow-y-auto">
+                      <div className="px-4 py-2 font-semibold text-dark border-b">Notifications</div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-gray-400 text-center">No notifications</div>
+                      ) : notifications.slice(0, 10).map((notif, i) => (
+                        <div key={notif._id || i} className={`px-4 py-3 text-sm border-b last:border-0 ${notif.read ? "bg-white" : "bg-primary/10"}`}>
+                          <div className="font-medium text-dark mb-1">{notif.message}</div>
+                          <div className="text-xs text-gray-400">{new Date(notif.createdAt).toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 p-1 pr-3 bg-dark text-white rounded-full hover:bg-dark-light transition-all shadow-md"

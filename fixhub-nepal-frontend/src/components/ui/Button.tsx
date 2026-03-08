@@ -26,7 +26,7 @@ export default function Button({
     danger: "bg-danger text-white hover:bg-red-700 focus:ring-danger shadow-lg hover:shadow-xl hover:scale-105 active:scale-100",
     success: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-600 shadow-lg hover:shadow-xl hover:scale-105 active:scale-100",
     ghost: "text-gray hover:text-dark hover:bg-gray-light focus:ring-gray",
-    gradient: "bg-gradient-to-r from-primary to-accent text-white hover:from-primary-dark hover:to-accent focus:ring-primary shadow-glow hover:shadow-xl hover:scale-105 active:scale-100",
+    gradient: "bg-linear-to-r from-primary to-accent text-white hover:from-primary-dark hover:to-accent focus:ring-primary shadow-glow hover:shadow-xl hover:scale-105 active:scale-100",
   };
 
   const sizes = {
@@ -43,7 +43,7 @@ export default function Button({
     >
       {/* Shimmer Effect */}
       {variant !== "ghost" && variant !== "outline" && (
-        <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></span>
+        <span className="absolute inset-0 w-full h-full bg-linear-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></span>
       )}
       
       {loading && <Loader2 className="h-5 w-5 animate-spin relative z-10" />}
