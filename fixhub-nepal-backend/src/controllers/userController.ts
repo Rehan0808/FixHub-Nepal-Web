@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import User from "../models/User";
-import { ResetJwtPayload } from "../types";
+import { AuthRequest, ResetJwtPayload } from "../types";
 
 /**
  * Registers a new user with a 'normal' role.
@@ -147,9 +147,9 @@ export const sendResetLink = async (req: Request, res: Response): Promise<void> 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
 
     const mailOptions: nodemailer.SendMailOptions = {
-      from: `'MotoFix' <${process.env.EMAIL_USER}>`,
+      from: `"FixHub Nepal" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "Reset Your MotoFix Password",
+      subject: "Reset Your FixHub Nepal Password",
       html: `
                 <p>Hello ${user.fullName},</p>
                 <p>You requested a password reset. Please click the link below to create a new password:</p>
@@ -176,6 +176,73 @@ export const sendResetLink = async (req: Request, res: Response): Promise<void> 
     });
   } catch (err) {
     console.error("Forgot Password Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error. Please try again.",
+    });
+  }
+};
+
+/**
+ * Sends a numeric OTP for password reset (mobile-only flow).
+ * Web continues using the link-based sendResetLink above.
+ */
+export const sendResetOtp = async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({ success: false, message: "Email is required" });
+    return;
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Do not reveal existence of account
+      res.status(200).json({
+        success: true,
+        message: "If an account with that email exists, an OTP has been sent.",
+      });
+      return;
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.resetOtp = otp;
+    user.resetOtpExpires = expires;
+    await user.save();
+
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: `"FixHub Nepal" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your FixHub Nepal password reset OTP",
+      html: `
+        <p>Hello ${user.fullName},</p>
+        <p>Your OTP for resetting your password is:</p>
+        <h2 style="letter-spacing: 4px;">${otp}</h2>
+        <p>This OTP will expire in 10 minutes.</p>
+        <p>If you did not request this, please ignore this email.</p>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (err) => {
+      if (err) {
+        console.error("Error sending OTP email:", err);
+        res.status(500).json({
+          success: false,
+          message: "Failed to send OTP email. Please try again later.",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "If an account with that email exists, an OTP has been sent.",
+      });
+    });
+  } catch (err) {
+    console.error("Send OTP Error:", err);
     res.status(500).json({
       success: false,
       message: "Server error. Please try again.",
@@ -223,3 +290,93 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
+/**
+ * Resets the user's password using an email + OTP (mobile-only flow).
+ */
+export const resetPasswordWithOtp = async (req: Request, res: Response): Promise<void> => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    res.status(400).json({
+      success: false,
+      message: "Email, OTP, and new password are required.",
+    });
+    return;
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user || !user.resetOtp || !user.resetOtpExpires) {
+      res.status(400).json({ success: false, message: "Invalid or expired OTP." });
+      return;
+    }
+
+    if (user.resetOtp !== otp) {
+      res.status(400).json({ success: false, message: "Invalid OTP." });
+      return;
+    }
+
+    if (user.resetOtpExpires.getTime() < Date.now()) {
+      res.status(400).json({ success: false, message: "OTP has expired." });
+      return;
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetOtp = undefined;
+    user.resetOtpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully.",
+    });
+  } catch (err) {
+    console.error("Reset Password OTP Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
+ * Changes the password for the currently authenticated user.
+ */
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ success: false, message: "Current password and new password are required." });
+    return;
+  }
+
+  try {
+    const userId = req.user?.id || (req.user as any)?._id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Authentication required." });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found." });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      res.status(400).json({ success: false, message: "Current password is incorrect." });
+      return;
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully.",
+    });
+  } catch (err) {
+    console.error("Change Password Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
