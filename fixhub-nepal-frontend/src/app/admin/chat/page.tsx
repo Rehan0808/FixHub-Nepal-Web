@@ -24,6 +24,7 @@ interface UserConversation {
   email: string;
   lastMessage?: string;
   unreadCount?: number;
+  lastMessageTimestamp?: string;
 }
 
 export default function AdminChat() {
@@ -57,12 +58,23 @@ export default function AdminChat() {
         });
       }
       
-      // Update last message in user list
-      setUsers((prev) =>
-        prev.map((u) =>
-          msg.room === `chat-${u._id}` ? { ...u, lastMessage: msg.message } : u
-        )
-      );
+      // Update last message and timestamp in user list
+      setUsers((prev) => {
+        // Update the user with the new message and move to top
+        const updated = prev.map((u) =>
+          msg.room === `chat-${u._id}`
+            ? { ...u, lastMessage: msg.message, lastMessageTimestamp: msg.createdAt }
+            : u
+        );
+        // Find the user index
+        const idx = updated.findIndex((u) => msg.room === `chat-${u._id}`);
+        if (idx > -1) {
+          const user = updated[idx];
+          updated.splice(idx, 1);
+          return [user, ...updated];
+        }
+        return updated;
+      });
     });
 
     return () => {
@@ -144,10 +156,17 @@ export default function AdminChat() {
     }
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter((u) =>
+      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Sort by lastMessageTimestamp descending
+      const aTime = a.lastMessageTimestamp ? new Date(a.lastMessageTimestamp).getTime() : 0;
+      const bTime = b.lastMessageTimestamp ? new Date(b.lastMessageTimestamp).getTime() : 0;
+      return bTime - aTime;
+    });
 
   return (
     <div className="animate-fade-in">
