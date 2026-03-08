@@ -5,6 +5,7 @@ import sendEmail from "../../utils/sendEmail";
 import puppeteer from "puppeteer";
 import getInvoiceHTML from "../../utils/invoiceTemplate";
 import { IBooking, IUser } from "../../types";
+import { createAndEmitNotification } from "../../utils/notify";
 
 const SUCCESS_ICON_URL =
   "https://cdn.vectorstock.com/i/500p/20/36/3d-green-check-icon-tick-mark-symbol-vector-56142036.jpg";
@@ -121,27 +122,53 @@ export const updateBooking = async (req: Request, res: Response): Promise<void> 
 
     if (statusChanged && booking.customer) {
       const io = req.app.get("socketio");
-      const userRoom = `chat-${(booking.customer as IUser)._id.toString()}`;
+      const userId = (booking.customer as IUser)._id.toString();
+      const userRoom = `chat-${userId}`;
       io.to(userRoom).emit("booking_status_update", {
         bookingId: updatedBookingWithPopulation!._id,
         serviceType: updatedBookingWithPopulation!.serviceType,
         newStatus: updatedBookingWithPopulation!.status,
         message: `Your booking for "${updatedBookingWithPopulation!.serviceType}" is now ${updatedBookingWithPopulation!.status}.`,
       });
+      // Create and emit notification for user
+      await createAndEmitNotification(io, {
+        recipientId: userId,
+        type: "status",
+        message: `Your booking for "${updatedBookingWithPopulation!.serviceType}" is now ${updatedBookingWithPopulation!.status}.`,
+        link: `/user/bookings`,
+        socketRoom: userRoom,
+      });
     }
 
     res.json({ success: true, data: updatedBookingWithPopulation, message: "Booking updated successfully." });
 
-    // Send completion email (non-blocking)
-    if (statusChanged && booking.customer && status === "Completed") {
+    // Send status change email (non-blocking)
+    if (statusChanged && booking.customer) {
       try {
         const customer = booking.customer as IUser;
-        const emailHtml = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"> <div style="text-align: center; padding: 20px; background-color: #f8f8f8;"> <img src="${SUCCESS_ICON_URL}" alt="Success Icon" style="width: 80px;"/> <h2 style="color: #27ae60;">Your Service is Complete!</h2> </div> <div style="padding: 20px;"> <p>Dear ${customer.fullName},</p> <p>We are pleased to inform you that your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> has been marked as <strong>Completed</strong>.</p> <p>We hope you are satisfied with our service. Please feel free to provide any feedback.</p> <p>Thank you again for choosing MotoFix!</p> </div> <hr/> <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p> </div>`;
-        sendEmail(customer.email, "Your MotoFix Service is Complete!", emailHtml).catch((err) =>
-          console.error("Error sending completion email:", err)
+        let subject = "Your FixHub Nepal Booking Status Updated";
+        let statusMsg = "";
+        let heading = "Booking Status Updated";
+        let icon = SUCCESS_ICON_URL;
+        if (status === "In Progress") {
+          heading = "Your Service is In Progress";
+          statusMsg = `We have started working on your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong>.`;
+        } else if (status === "Completed") {
+          heading = "Your Service is Complete!";
+          statusMsg = `We are pleased to inform you that your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> has been marked as <strong>Completed</strong>.`;
+        } else if (status === "Pending") {
+          heading = "Booking Received";
+          statusMsg = `Your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> is now <strong>Pending</strong>. We will update you as soon as work begins.`;
+        } else if (status === "Cancelled") {
+          heading = "Booking Cancelled";
+          statusMsg = `Your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> has been <strong>Cancelled</strong>.`;
+        }
+        const emailHtml = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"> <div style="text-align: center; padding: 20px; background-color: #f8f8f8;"> <img src="${icon}" alt="Status Icon" style="width: 80px;"/> <h2 style="color: #27ae60;">${heading}</h2> </div> <div style="padding: 20px;"> <p>Dear ${customer.fullName},</p> <p>${statusMsg}</p> <p>Thank you for choosing FixHub Nepal!</p> </div> <hr/> <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p> </div>`;
+        sendEmail(customer.email, subject, emailHtml).catch((err) =>
+          console.error("Error sending status update email:", err)
         );
       } catch (emailError) {
-        console.error("Error preparing completion email:", emailError);
+        console.error("Error preparing status update email:", emailError);
       }
     }
   } catch (error) {
@@ -198,12 +225,12 @@ export const deleteBooking = async (req: Request, res: Response): Promise<void> 
 
       const customer = booking.customer as IUser;
       if (customer && customer.email) {
-        const subject = "Your MotoFix Booking Has Been Cancelled";
+        const subject = "Your FixHub Nepal Booking Has Been Cancelled";
         const refundMessage =
           booking.isPaid && booking.paymentMethod !== "COD"
             ? `<p>A refund for <strong>Rs. ${booking.finalAmount}</strong> will be processed shortly.</p>`
             : "";
-        const emailHtml = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"> <div style="text-align: center; padding: 20px; background-color: #f8f8f8;"> <h2 style="color: #c0392b;">Booking Cancelled</h2> </div> <div style="padding: 20px;"> <p>Dear ${customer.fullName},</p> <p>We're writing to inform you that your booking <strong>#${booking._id}</strong> for <strong>"${booking.serviceType}"</strong> has been cancelled by our administration.</p> ${refundMessage} ${pointsReversalMessage} <p>We apologize for any inconvenience.</p> <p>Thank you,<br>The MotoFix Team</p> </div></div>`;
+        const emailHtml = `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;"> <div style="text-align: center; padding: 20px; background-color: #f8f8f8;"> <h2 style="color: #c0392b;">Booking Cancelled</h2> </div> <div style="padding: 20px;"> <p>Dear ${customer.fullName},</p> <p>We're writing to inform you that your booking <strong>#${booking._id}</strong> for <strong>"${booking.serviceType}"</strong> has been cancelled by our administration.</p> ${refundMessage} ${pointsReversalMessage} <p>We apologize for any inconvenience.</p> <p>Thank you,<br>The FixHub Nepal Team</p> </div></div>`;
         sendEmail(customer.email, subject, emailHtml).catch((err) =>
           console.error("Error sending cancellation email:", err)
         );
