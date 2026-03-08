@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Booking } from "@/types";
-import { Calendar, Eye, X, Check, Play, ShieldCheck, Search, User, Car, Hash, Clock, Info, CircleDollarSign } from "lucide-react";
+import { Calendar, Eye, X, Check, Play, ShieldCheck, Search, User, Car, Hash, Clock, Info, CircleDollarSign, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 
@@ -16,6 +16,21 @@ export default function AdminBookings() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deleteBooking = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this booking? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/admin/bookings/${id}`);
+      toast.success("Booking deleted successfully");
+      setBookings((prev) => prev.filter((b) => b._id !== id));
+      if (selectedBooking && selectedBooking._id === id) setSelectedBooking(null);
+    } catch {
+      toast.error("Failed to delete booking");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     fetchBookings();
@@ -146,10 +161,21 @@ export default function AdminBookings() {
                     <td className="p-4">
                       <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right flex gap-2 justify-end">
                       <Button variant="outline" size="sm" onClick={() => setSelectedBooking(booking)}>
                         <Eye className="h-4 w-4 mr-2" />
                         View
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => deleteBooking(booking._id)}
+                        loading={deletingId === booking._id}
+                        disabled={deletingId === booking._id}
+                        title="Delete Booking"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
                       </Button>
                     </td>
                   </tr>
@@ -203,6 +229,12 @@ export default function AdminBookings() {
                 <div className="flex items-center justify-between py-3 border-b border-gray-border">
                   <span className="flex items-center gap-2 text-gray"><Info className="h-4 w-4" /> Status</span>
                   <Badge variant={statusVariant(selectedBooking.status)}>{selectedBooking.status}</Badge>
+                </div>
+                <div className="flex items-center justify-between py-3 border-b border-gray-border">
+                  <span className="flex items-center gap-2 text-gray"><CircleDollarSign className="h-4 w-4" /> Payment</span>
+                  <span className={`font-medium ${selectedBooking.isPaid ? 'text-green-600' : 'text-red-600'}`}>
+                    {selectedBooking.isPaid ? 'Paid' : 'Not Paid'}
+                  </span>
                 </div>
               </div>
               {/* Right side */}
