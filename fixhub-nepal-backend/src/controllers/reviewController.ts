@@ -65,4 +65,27 @@ const createServiceReview = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
-export { createServiceReview };
+/**
+ * Gets all reviews across all services.
+ */
+const getAllReviews = async (req: any, res: Response): Promise<void> => {
+  try {
+    const services = await Service.find({ "reviews.0": { $exists: true } }).select("reviews name");
+    const allReviews: any[] = [];
+    services.forEach((service: any) => {
+      service.reviews.forEach((review: any) => {
+        allReviews.push({
+          ...review.toObject(),
+          serviceName: service.name,
+          serviceId: service._id,
+        });
+      });
+    });
+    res.status(200).json({ success: true, data: allReviews });
+  } catch (error: any) {
+    console.error("Error fetching reviews:", error.message);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+export { createServiceReview, getAllReviews };
