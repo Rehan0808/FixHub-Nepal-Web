@@ -57,4 +57,35 @@ const updateUserProfile = async (req: AuthRequest, res: Response): Promise<void>
   }
 };
 
-export { getUserProfile, updateUserProfile };
+/**
+ * Updates only the profile picture (for mobile app; POST + multipart works reliably).
+ * Web frontend continues to use PUT /profile with optional profilePicture.
+ */
+const updateUserProfilePicture = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: "No profile picture file provided." });
+      return;
+    }
+    const userId = (req as AuthRequest).user?.id ?? (req as any).user?._id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Authentication required." });
+      return;
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+    user.profilePicture = req.file.path.replace(/\\/g, "/");
+    const updatedUser = await user.save();
+    const userResponse = updatedUser.toObject() as any;
+    delete userResponse.password;
+    res.json({ success: true, data: userResponse, message: "Profile picture updated successfully." });
+  } catch (error: any) {
+    console.error("Profile picture update error:", error);
+    res.status(500).json({ success: false, message: error.message || "Server Error" });
+  }
+};
+
+export { getUserProfile, updateUserProfile, updateUserProfilePicture };
