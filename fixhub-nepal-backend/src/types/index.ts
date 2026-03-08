@@ -15,6 +15,8 @@ export interface IUser extends Document {
   address: string;
   profilePicture: string;
   loyaltyPoints: number;
+  resetOtp?: string;
+  resetOtpExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
