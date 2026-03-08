@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
+import AIChatWidget from "@/components/chat/AIChatWidget";
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       <main className="flex-1 bg-gray-light">
         <div className="p-6 lg:p-8">{children}</div>
       </main>
+      <AIChatWidget />
     </div>
   );
 }
