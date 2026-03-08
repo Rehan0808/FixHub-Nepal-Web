@@ -11,6 +11,8 @@ const UserSchema = new Schema<IUser>(
     address: { type: String, default: "" },
     profilePicture: { type: String, default: "" },
     loyaltyPoints: { type: Number, default: 0 },
+    resetOtp: { type: String },
+    resetOtpExpires: { type: Date },
   },
   { timestamps: true }
 );
