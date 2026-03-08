@@ -6,6 +6,8 @@ import http from "http";
 import { Server, Socket } from "socket.io";
 import connectDB from "./config/db";
 import Message from "./models/Message";
+import User from "./models/User";
+import { createAndEmitNotification } from "./utils/notify";
 
 // Route imports
 import userRoute from "./routes/userRoute";
@@ -23,6 +25,8 @@ import userChatRoute from "./routes/user/chatRoute";
 import esewaRoute from "./routes/esewaRoute";
 import geminiRoute from "./routes/gemini";
 import reviewRoute from "./routes/reviewRoute";
+import messageRoutes from "./routes/messageRoutes";
+import notificationRoute from "./routes/notificationRoute";
 
 const app = express();
 const server = http.createServer(app);
@@ -50,14 +54,17 @@ app.use("/api/admin/services", adminServiceRoute);
 app.use("/api/admin/profile", adminProfileRoute);
 app.use("/api/admin", adminDashboardRoute);
 app.use("/api/admin/chat", adminChatRoute);
+// Profile route first so POST /profile/picture is matched (dashboard/booking/service don't handle it)
+app.use("/api/user", userProfileRoute);
 app.use("/api/user", userDashboardRoute);
 app.use("/api/user", userBookingRoute);
 app.use("/api/user", userServiceRoute);
-app.use("/api/user", userProfileRoute);
 app.use("/api/user/chat", userChatRoute);
 app.use("/api/payment/esewa", esewaRoute);
 app.use("/api/gemini", geminiRoute);
 app.use("/api/reviews", reviewRoute);
+app.use("/api/messages", messageRoutes);
+app.use("/api/notifications", notificationRoute);
 
 // --- Socket.IO ---
 io.on("connection", (socket: Socket) => {
@@ -100,13 +107,40 @@ io.on("connection", (socket: Socket) => {
           isRead: false,
         });
         await message.save();
-        console.log(`Broadcasting message to room ${data.room}, message ID: ${message._id}`);
+
+        // Broadcast message to the chat room as before
         io.to(data.room).emit("receive_message", message);
-        io.to(data.room).emit("new_message_notification", {
-          room: data.room,
-          authorId: data.authorId,
-          message: data.message,
-        });
+
+        const preview =
+          data.message.length > 50 ? data.message.substring(0, 50) + "..." : data.message;
+
+        // --- USER sent a message → notify all ADMINS ---
+        if (data.authorId !== "admin_user") {
+          const admins = await User.find({ role: "admin" });
+          for (const admin of admins) {
+            await createAndEmitNotification(io, {
+              recipientId: admin._id.toString(),
+              type: "chat",
+              message: `New message from ${data.author}: "${preview}"`,
+              link: `/admin/chat`,
+              // Emit to admin's personal room so they get it even if chat isn't open
+              socketRoom: `chat-${admin._id.toString()}`,
+            });
+          }
+        }
+
+        // --- ADMIN sent a message → notify the USER ---
+        if (data.authorId === "admin_user") {
+          // Room format is "chat-{userId}", extract the userId
+          const roomUserId = data.room.replace("chat-", "");
+          await createAndEmitNotification(io, {
+            recipientId: roomUserId,
+            type: "chat",
+            message: `Admin replied: "${preview}"`,
+            link: `/chat`,
+            socketRoom: data.room, // user is always in their own chat room
+          });
+        }
       } catch (error) {
         console.error("Error saving message:", error);
       }
@@ -132,9 +166,4 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // --- Start Server ---
-const PORT = process.env.PORT || 5050;
-const listenServer = server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
-
-export { app, listenServer as server, io };
+export { app, server, io };
