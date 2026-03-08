@@ -26,6 +26,22 @@ export const getServices = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
+ * Gets a single service by ID.
+ */
+export const getServiceById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const service = await Service.findById(req.params.id);
+    if (!service) {
+      res.status(404).json({ success: false, message: "Service not found." });
+      return;
+    }
+    res.status(200).json({ success: true, data: service });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: "Server error.", error: error.message });
+  }
+};
+
+/**
  * Creates a new service.
  */
 export const createService = async (req: Request, res: Response): Promise<void> => {
