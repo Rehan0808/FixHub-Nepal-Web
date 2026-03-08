@@ -1,40 +1,40 @@
 import { IBooking, IUser } from "../types";
 
 interface WorkshopDetails {
-  name: string;
-  address: string;
-  phone: string;
+    name: string;
+    address: string;
+    phone: string;
 }
 
 /**
  * Generates an HTML invoice for a booking.
  */
 const getInvoiceHTML = (booking: IBooking & { customer: IUser }, workshop: WorkshopDetails): string => {
-  const safeBooking = booking || ({} as IBooking);
-  const safeWorkshop = workshop || ({} as WorkshopDetails);
-  const safeCustomer = (safeBooking.customer as IUser) || ({} as IUser);
+    const safeBooking = booking || ({} as IBooking);
+    const safeWorkshop = workshop || ({} as WorkshopDetails);
+    const safeCustomer = (safeBooking.customer as IUser) || ({} as IUser);
 
-  const serviceCost = safeBooking.totalCost ?? 0;
-  const pickupDropoffCost = safeBooking.requestedPickupDropoff ? (safeBooking.pickupDropoffCost ?? 0) : 0;
-  const subtotalBeforeDiscount = serviceCost + pickupDropoffCost;
-  const discount = safeBooking.discountAmount ?? 0;
-  const grandTotal = safeBooking.finalAmount ?? 0;
+    const serviceCost = safeBooking.totalCost ?? 0;
+    const pickupDropoffCost = safeBooking.requestedPickupDropoff ? (safeBooking.pickupDropoffCost ?? 0) : 0;
+    const subtotalBeforeDiscount = serviceCost + pickupDropoffCost;
+    const discount = safeBooking.discountAmount ?? 0;
+    const grandTotal = safeBooking.finalAmount ?? 0;
 
-  const invoiceDate = new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
-  const serviceDate = safeBooking.date
-    ? new Date(safeBooking.date).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
-    : "N/A";
+    const invoiceDate = new Date().toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
+    const serviceDate = safeBooking.date
+        ? new Date(safeBooking.date).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+        : "N/A";
 
-  const paymentMethodText =
-    safeBooking.isPaid && safeBooking.paymentMethod
-      ? `PAID via ${safeBooking.paymentMethod.toUpperCase()}`
-      : safeBooking.isPaid
-        ? "PAID"
-        : "";
+    const paymentMethodText =
+        safeBooking.isPaid && safeBooking.paymentMethod
+            ? `PAID via ${safeBooking.paymentMethod.toUpperCase()}`
+            : safeBooking.isPaid
+                ? "PAID"
+                : "";
 
-  const logoUrl = "https://user-gen-media-assets.s3.amazonaws.com/gpt4o_images/22aff172-b276-441f-bcf5-c02c648871ce.png";
+    const logoUrl = "https://user-gen-media-assets.s3.amazonaws.com/gpt4o_images/22aff172-b276-441f-bcf5-c02c648871ce.png";
 
-  return `
+    return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -88,7 +88,7 @@ const getInvoiceHTML = (booking: IBooking & { customer: IUser }, workshop: Works
             <header class="header">
                 <div class="workshop-info">
                     <img src="${logoUrl}" alt="Workshop Logo" class="workshop-logo"/>
-                    <h2>${safeWorkshop.name || "MotoFix Workshop"}</h2>
+                    <h2>${safeWorkshop.name || "FixHub Nepal Workshop"}</h2>
                     <p>${safeWorkshop.address || "Address not available"}</p>
                     <p>${safeWorkshop.phone || "Phone not available"}</p>
                 </div>
@@ -128,9 +128,8 @@ const getInvoiceHTML = (booking: IBooking & { customer: IUser }, workshop: Works
                         </td>
                         <td style="text-align: right;">Rs. ${serviceCost.toFixed(2)}</td>
                     </tr>
-                    ${
-                      safeBooking.requestedPickupDropoff
-                        ? `
+                    ${safeBooking.requestedPickupDropoff
+            ? `
                     <tr class="item-row">
                         <td>
                             Pick-up & Drop-off Service
@@ -141,8 +140,8 @@ const getInvoiceHTML = (booking: IBooking & { customer: IUser }, workshop: Works
                         <td style="text-align: right;">Rs. ${pickupDropoffCost.toFixed(2)}</td>
                     </tr>
                     `
-                        : ""
-                    }
+            : ""
+        }
                 </tbody>
             </table>
 

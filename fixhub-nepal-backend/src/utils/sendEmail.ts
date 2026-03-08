@@ -18,7 +18,7 @@ const sendEmail = async (
   });
 
   const mailOptions: nodemailer.SendMailOptions = {
-    from: `"MotoFix" <${process.env.EMAIL_USER}>`,
+    from: `"FixHub Nepal" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,
