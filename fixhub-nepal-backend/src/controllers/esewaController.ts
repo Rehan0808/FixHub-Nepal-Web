@@ -34,8 +34,14 @@ const awardLoyaltyPoints = async (userId: string): Promise<number> => {
  */
 export const initiateEsewaPayment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { bookingId } = req.body;
+    const { bookingId, frontendUrl } = req.body;
     const booking = await Booking.findById(bookingId);
+
+    // Use frontend URL for redirects (so eSewa returns to the frontend UI, not the backend)
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const callbackBase = `${protocol}://${host}`;
+    const frontendBase = frontendUrl || callbackBase;
 
     if (!booking) {
       res.status(404).json({ message: "Booking not found" });
@@ -59,8 +65,8 @@ export const initiateEsewaPayment = async (req: Request, res: Response): Promise
 
     const esewaData = {
       amount: amountToPay,
-      success_url: `http://localhost:3000/payment/esewa/success`,
-      failure_url: "http://localhost:3000/payment/esewa/failure",
+      success_url: `${frontendBase}/payment/esewa/success`,
+      failure_url: `${frontendBase}/payment/esewa/failure`,
       product_delivery_charge: "0",
       product_service_charge: "0",
       product_code: ESEWA_SCD,
@@ -103,8 +109,9 @@ export const verifyEsewaPayment = async (req: Request, res: Response): Promise<v
 
     if (verificationResponse.status === "COMPLETE") {
       // Extract booking ID from transaction UUID (format: bookingId-timestamp-random)
-      const bookingId = decodedData.transaction_uuid.split('-')[0];
-      
+      // MongoDB ObjectIds are 24 hex chars, so grab first 24 characters
+      const bookingId = decodedData.transaction_uuid.substring(0, 24);
+
       const booking = (await Booking.findById(bookingId).populate(
         "customer",
         "fullName email"
@@ -144,13 +151,13 @@ export const verifyEsewaPayment = async (req: Request, res: Response): Promise<v
                             <p>Your appointment for <strong>${booking.serviceType}</strong> on <strong>${new Date(booking.date).toLocaleDateString()}</strong> is confirmed.</p>
                             <p>You have earned <strong>${points} loyalty points</strong> for this booking!</p>
                             <p>Total Amount Paid: <strong>Rs. ${booking.finalAmount}</strong></p>
-                            <p>Thank you for choosing MotoFix!</p>
+                            <p>Thank you for choosing FixHub Nepal!</p>
                         </div>
                         <hr/>
                         <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p>
                     </div>
                 `;
-        await sendEmail(customer.email, "Your MotoFix Booking is Confirmed!", emailHtml);
+        await sendEmail(customer.email, "Your FixHub Nepal Booking is Confirmed!", emailHtml);
       } catch (emailError) {
         console.error("Error sending eSewa success email:", emailError);
       }
