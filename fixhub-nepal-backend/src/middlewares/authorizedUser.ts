@@ -1,4 +1,4 @@
-import { Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
 import { AuthRequest, JwtPayload } from "../types";
@@ -7,7 +7,7 @@ import { AuthRequest, JwtPayload } from "../types";
  * Middleware: Verifies JWT token and attaches user to request.
  */
 export const authenticateUser = async (
-  req: AuthRequest,
+  req: Request,  // ✅ Changed from AuthRequest to Request
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -34,7 +34,8 @@ export const authenticateUser = async (
       return;
     }
 
-    req.user = user;
+    // ✅ Cast req to AuthRequest when assigning user
+    (req as AuthRequest).user = user;
     next();
   } catch (err: any) {
     console.error("Authentication Error:", err.message);
@@ -49,11 +50,13 @@ export const authenticateUser = async (
  * Middleware: Checks if the authenticated user is an admin.
  */
 export const isAdmin = (
-  req: AuthRequest,
+  req: Request,  // ✅ Changed from AuthRequest to Request
   res: Response,
   next: NextFunction
 ): void => {
-  if (req.user && req.user.role === "admin") {
+  // ✅ Cast req to AuthRequest when accessing user
+  const authReq = req as AuthRequest;
+  if (authReq.user && authReq.user.role === "admin") {
     next();
   } else {
     res.status(403).json({
