@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   /* Tailwind v4 uses --color-* syntax to auto-generate classes */
