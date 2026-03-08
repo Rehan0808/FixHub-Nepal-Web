@@ -6,7 +6,13 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { Service } from "@/types";
-import { Wrench, Search, Clock, X, Calendar, Car, Hash, Info, MapPin, Loader2 } from "lucide-react";
+import { Wrench, Search, Clock, X, Calendar, Car, Hash, Info, MapPin, Loader2, Navigation } from "lucide-react";
+import ServiceDetailsModal from "@/components/ServiceDetailsModal";
+import dynamic from "next/dynamic";
+const MapPickerModal = dynamic(() => import("@/components/MapPickerModal"), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"><div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-3"><Loader2 className="h-10 w-10 animate-spin text-primary" /><p className="text-gray font-medium">Initializing Map...</p></div></div>
+});
 import toast from "react-hot-toast";
 
 export default function UserServices() {
@@ -14,6 +20,7 @@ export default function UserServices() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [bookingService, setBookingService] = useState<Service | null>(null);
+  const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
   const [bookingForm, setBookingForm] = useState({
     vehicleName: "",
     vehicleNumber: "",
@@ -60,16 +67,16 @@ export default function UserServices() {
           );
           const data = await response.json();
           const address = data.display_name || `${latitude}, ${longitude}`;
-          
+
           if (field === 'pickup') {
-            setBookingForm({ 
-              ...bookingForm, 
+            setBookingForm({
+              ...bookingForm,
               pickupAddress: address,
               pickupCoordinates: { lat: latitude, lng: longitude }
             });
           } else {
-            setBookingForm({ 
-              ...bookingForm, 
+            setBookingForm({
+              ...bookingForm,
               dropoffAddress: address,
               dropoffCoordinates: { lat: latitude, lng: longitude }
             });
@@ -152,14 +159,14 @@ export default function UserServices() {
       await api.post("/user/bookings", payload);
       toast.success("Booking created successfully! You can track it in 'My Bookings'.");
       setBookingService(null);
-      setBookingForm({ 
-        vehicleName: "", 
-        vehicleNumber: "", 
-        date: "", 
-        time: "", 
-        description: "", 
-        requestPickup: false, 
-        pickupAddress: "", 
+      setBookingForm({
+        vehicleName: "",
+        vehicleNumber: "",
+        date: "",
+        time: "",
+        description: "",
+        requestPickup: false,
+        pickupAddress: "",
         dropoffAddress: "",
         pickupCoordinates: { lat: 0, lng: 0 },
         dropoffCoordinates: { lat: 0, lng: 0 },
@@ -213,8 +220,8 @@ export default function UserServices() {
                 {/* Service Image */}
                 {service.image ? (
                   <div className="w-full h-48 mb-4 rounded-lg overflow-hidden bg-gray-100">
-                    <img 
-                      src={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}/${service.image}`} 
+                    <img
+                      src={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}/${service.image}`}
                       alt={service.name}
                       className="w-full h-full object-cover"
                     />
@@ -224,8 +231,8 @@ export default function UserServices() {
                     <Wrench className="h-16 w-16 text-primary/40" />
                   </div>
                 )}
-                
-                <div className="flex-grow">
+
+                <div className="grow">
                   <div className="mb-4">
                     <h3 className="font-bold text-lg text-dark">{service.name}</h3>
                     {service.category && (
@@ -234,7 +241,7 @@ export default function UserServices() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray mb-4 line-clamp-3 flex-grow">{service.description}</p>
+                  <p className="text-sm text-gray mb-4 line-clamp-3 grow">{service.description}</p>
                 </div>
                 <div className="mt-auto">
                   <div className="flex items-baseline justify-between mb-4">
@@ -245,9 +252,14 @@ export default function UserServices() {
                       </span>
                     )}
                   </div>
-                  <Button size="md" onClick={() => setBookingService(service)} className="w-full">
-                    Book Now
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="md" variant="outline" onClick={() => setViewDetailsId(service._id)} className="w-1/2">
+                      View Details
+                    </Button>
+                    <Button size="md" onClick={() => setBookingService(service)} className="w-1/2">
+                      Book Now
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -263,6 +275,36 @@ export default function UserServices() {
             </p>
           </div>
         </Card>
+      )}
+
+      {/* Service Details Modal */}
+      {viewDetailsId && (
+        <ServiceDetailsModal serviceId={viewDetailsId} onClose={() => setViewDetailsId(null)} />
+      )}
+
+      {/* Map Picker Modal */}
+      {fetchingLocation && (
+        <MapPickerModal
+          title={fetchingLocation === 'pickup' ? "Select Pickup Location" : "Select Dropoff Location"}
+          onClose={() => setFetchingLocation(null)}
+          initialAddress={fetchingLocation === 'pickup' ? bookingForm.pickupAddress : bookingForm.dropoffAddress}
+          initialCoordinates={fetchingLocation === 'pickup' ? bookingForm.pickupCoordinates : bookingForm.dropoffCoordinates}
+          onSelect={(addr: string, coords: { lat: number; lng: number }) => {
+            if (fetchingLocation === 'pickup') {
+              setBookingForm({
+                ...bookingForm,
+                pickupAddress: addr,
+                pickupCoordinates: coords
+              });
+            } else {
+              setBookingForm({
+                ...bookingForm,
+                dropoffAddress: addr,
+                dropoffCoordinates: coords
+              });
+            }
+          }}
+        />
       )}
 
       {/* Booking Modal */}
@@ -310,7 +352,7 @@ export default function UserServices() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-dark flex items-center gap-2">
+                <label className="text-sm font-medium text-dark flex items-center gap-2">
                   <Info className="h-4 w-4 text-gray" />
                   Problem Description <span className="text-gray text-xs">(Optional)</span>
                 </label>
@@ -337,7 +379,7 @@ export default function UserServices() {
                       Pick-up & Drop-off Service
                     </span>
                     <p className="text-xs text-gray mt-0.5">
-                      Request Pick-up and Drop-off (Rs. 50 per km)
+                      Request Pick-up and Drop-off (+Rs. 200 flat)
                     </p>
                   </div>
                 </label>
@@ -360,16 +402,11 @@ export default function UserServices() {
                         />
                         <button
                           type="button"
-                          onClick={() => fetchUserLocation('pickup')}
-                          disabled={fetchingLocation === 'pickup'}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                          title="Use current location"
+                          onClick={() => setFetchingLocation('pickup')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          title="Open Map Picker"
                         >
-                          {fetchingLocation === 'pickup' ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <MapPin className="h-4 w-4" />
-                          )}
+                          <Navigation className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -390,20 +427,15 @@ export default function UserServices() {
                         />
                         <button
                           type="button"
-                          onClick={() => fetchUserLocation('dropoff')}
-                          disabled={fetchingLocation === 'dropoff'}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                          title="Use current location"
+                          onClick={() => setFetchingLocation('dropoff')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          title="Open Map Picker"
                         >
-                          {fetchingLocation === 'dropoff' ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <MapPin className="h-4 w-4" />
-                          )}
+                          <Navigation className="h-4 w-4" />
                         </button>
                       </div>
                       <p className="text-xs text-gray">
-                        You can manually enter or change the dropoff location
+                        You can manually enter or use the map to pin the exact location
                       </p>
                     </div>
 
@@ -413,12 +445,18 @@ export default function UserServices() {
                         <span className="text-sm font-medium text-dark">Service Price:</span>
                         <span className="text-sm text-dark">Rs. {bookingService.price}</span>
                       </div>
+                      {bookingForm.requestPickup && (
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-sm font-medium text-dark">Pick-up & Drop-off:</span>
+                          <span className="text-sm text-dark">+ Rs. 200</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-primary/10">
                         <span className="text-base font-bold text-dark">Total Amount:</span>
-                        <span className="text-lg font-bold text-primary">Rs. {bookingService.price}</span>
+                        <span className="text-lg font-bold text-primary">Rs. {bookingService.price + (bookingForm.requestPickup ? 200 : 0)}</span>
                       </div>
                       <p className="text-xs text-gray mt-2">
-                        * Pick-up/Drop-off charges will be calculated based on actual distance
+                        * Pick-up/Drop-off charges are a flat Rs. 200
                       </p>
                     </div>
                   </div>
