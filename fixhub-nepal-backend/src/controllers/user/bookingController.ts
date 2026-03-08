@@ -5,6 +5,7 @@ import User from "../../models/User";
 import Workshop from "../../models/Workshop";
 import axios from "axios";
 import sendEmail from "../../utils/sendEmail";
+import { createAndEmitNotification } from "../../utils/notify";
 import { AuthRequest, IBooking, IUser, ICoordinates } from "../../types";
 
 const SUCCESS_ICON_URL =
@@ -34,13 +35,17 @@ const calculateDistance = (_coord1: ICoordinates, _coord2: ICoordinates): number
 /**
  * Gets all bookings for the authenticated user with pagination.
  */
-const getUserBookings = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserBookings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 11;
     const skip = (page - 1) * limit;
 
-    const query = { customer: req.user.id };
+    // Allow filtering by status if provided
+    const query: any = { customer: req.user.id };
+    if (req.query.status && typeof req.query.status === 'string') {
+      query.status = req.query.status;
+    }
 
     const totalItems = await Booking.countDocuments(query);
     const bookings = await Booking.find(query).sort({ createdAt: -1 }).limit(limit).skip(skip);
@@ -60,7 +65,7 @@ const getUserBookings = async (req: AuthRequest, res: Response): Promise<void> =
 /**
  * Gets a single booking by ID for the authenticated user.
  */
-const getUserBookingById = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserBookingById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const booking = await Booking.findOne({ _id: req.params.id, customer: req.user.id });
     if (!booking) {
@@ -76,7 +81,7 @@ const getUserBookingById = async (req: AuthRequest, res: Response): Promise<void
 /**
  * Gets all pending (unpaid) bookings for the user.
  */
-const getPendingBookings = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getPendingBookings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const bookings = await Booking.find({
       customer: req.user.id,
@@ -93,7 +98,7 @@ const getPendingBookings = async (req: AuthRequest, res: Response): Promise<void
 /**
  * Gets booking history (paid bookings) for the user.
  */
-const getBookingHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getBookingHistory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const query = { customer: req.user.id, paymentStatus: "Paid" };
     const bookings = await Booking.find(query).sort({ createdAt: -1 });
@@ -107,7 +112,7 @@ const getBookingHistory = async (req: AuthRequest, res: Response): Promise<void>
 /**
  * Creates a new booking for the authenticated user.
  */
-const createBooking = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createBooking = async (req: AuthRequest, res: Response): Promise<void> => {
   const {
     serviceId,
     bikeModel,
@@ -152,12 +157,12 @@ const createBooking = async (req: AuthRequest, res: Response): Promise<void> => 
     let finalAmount = service.price;
 
     if (requestedPickupDropoff) {
-      if (!pickupAddress || !dropoffAddress || !pickupCoordinates || !dropoffCoordinates) {
+      if (!pickupAddress || !dropoffAddress) {
         res.status(400).json({ success: false, message: "Pickup/Dropoff details are incomplete." });
         return;
       }
-      pickupDropoffDistance = calculateDistance(pickupCoordinates, dropoffCoordinates);
-      pickupDropoffCost = pickupDropoffDistance * (workshop.pickupDropoffChargePerKm || 50);
+      // Flat fee for pickup/dropoff
+      pickupDropoffCost = 200;
       finalAmount += pickupDropoffCost;
     }
 
@@ -184,6 +189,20 @@ const createBooking = async (req: AuthRequest, res: Response): Promise<void> => 
     });
 
     await booking.save();
+
+    // Notify all admins of new booking
+    const io = req.app.get("socketio");
+    const admins = await User.find({ role: "admin" });
+    for (const admin of admins) {
+      await createAndEmitNotification(io, {
+        recipientId: admin._id.toString(),
+        type: "booking",
+        message: `New booking from ${user.fullName} for ${service.name}.`,
+        link: `/admin/bookings`,
+        socketRoom: `chat-${admin._id.toString()}`,
+      });
+    }
+
     res.status(201).json({ success: true, data: booking, message: "Booking created. Please complete payment." });
   } catch (error) {
     console.error("Error creating booking:", error);
@@ -194,7 +213,7 @@ const createBooking = async (req: AuthRequest, res: Response): Promise<void> => 
 /**
  * Updates an existing booking for the user.
  */
-const updateUserBooking = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateUserBooking = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const {
       serviceId,
@@ -227,25 +246,18 @@ const updateUserBooking = async (req: AuthRequest, res: Response): Promise<void>
 
     if (!booking) { res.status(404).json({ success: false, message: "Booking not found" }); return; }
     if (booking.customer.toString() !== req.user.id) { res.status(401).json({ success: false, message: "User not authorized" }); return; }
-    
+
     // Allow status/payment updates even for paid bookings
-    if (status) {
-      booking.status = status;
-    }
-    if (paymentMethod) {
-      booking.paymentMethod = paymentMethod;
-    }
-    if (paymentStatus) {
-      booking.paymentStatus = paymentStatus;
-    }
+    if (status) booking.status = status;
+    if (paymentMethod) booking.paymentMethod = paymentMethod;
+    if (paymentStatus) booking.paymentStatus = paymentStatus;
 
     // Only allow other updates if booking is still pending and unpaid
-    if (booking.status !== "Pending" && !status || booking.isPaid || booking.discountApplied) {
+    if ((booking.status !== "Pending" && !status) || booking.isPaid || booking.discountApplied) {
       if (!status && !paymentMethod && !paymentStatus) {
         res.status(400).json({ success: false, message: "Cannot edit a booking that is already in progress, paid, or has a discount." });
         return;
       }
-      // If only updating status/payment fields, save and return
       await booking.save();
       res.json({ success: true, data: booking, message: "Booking updated successfully" });
       return;
@@ -326,7 +338,7 @@ const updateUserBooking = async (req: AuthRequest, res: Response): Promise<void>
 /**
  * Deletes (cancels) an unpaid booking.
  */
-const deleteUserBooking = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteUserBooking = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const booking = await Booking.findById(req.params.id);
 
@@ -353,7 +365,7 @@ const deleteUserBooking = async (req: AuthRequest, res: Response): Promise<void>
 /**
  * Confirms COD payment for a booking.
  */
-const confirmPayment = async (req: AuthRequest, res: Response): Promise<void> => {
+export const confirmPayment = async (req: AuthRequest, res: Response): Promise<void> => {
   const { paymentMethod } = req.body;
   if (paymentMethod !== "COD") {
     res.status(400).json({ success: false, message: "This route is only for COD payments." });
@@ -383,24 +395,24 @@ const confirmPayment = async (req: AuthRequest, res: Response): Promise<void> =>
     try {
       const customer = booking.customer as IUser;
       const emailHtml = `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <div style="text-align: center; padding: 20px; background-color: #f8f8f8;">
-                        <img src="${SUCCESS_ICON_URL}" alt="Success Icon" style="width: 80px;"/>
-                        <h2 style="color: #2c3e50;">Booking Confirmed!</h2>
-                    </div>
-                    <div style="padding: 20px;">
-                        <p>Dear ${customer.fullName},</p>
-                        <p>Your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> on <strong>${new Date(booking.date).toLocaleDateString()}</strong> has been confirmed.</p>
-                        <p>You have earned <strong>${points} loyalty points</strong> for this booking!</p>
-                        <p>Please pay <strong>Rs. ${booking.finalAmount}</strong> upon service completion.</p>
-                        <p>Payment Method: <strong>Cash on Delivery (COD)</strong></p>
-                        <p>Thank you for choosing MotoFix!</p>
-                    </div>
-                    <hr/>
-                    <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p>
-                </div>
-            `;
-      await sendEmail(customer.email, "Your MotoFix Booking is Confirmed!", emailHtml);
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="text-align: center; padding: 20px; background-color: #f8f8f8;">
+            <img src="${SUCCESS_ICON_URL}" alt="Success Icon" style="width: 80px;"/>
+            <h2 style="color: #2c3e50;">Booking Confirmed!</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Dear ${customer.fullName},</p>
+            <p>Your booking <strong>#${booking._id}</strong> for <strong>${booking.serviceType}</strong> on <strong>${new Date(booking.date).toLocaleDateString()}</strong> has been confirmed.</p>
+            <p>You have earned <strong>${points} loyalty points</strong> for this booking!</p>
+            <p>Please pay <strong>Rs. ${booking.finalAmount}</strong> upon service completion.</p>
+            <p>Payment Method: <strong>Cash on Delivery (COD)</strong></p>
+            <p>Thank you for choosing FixHub Nepal!</p>
+          </div>
+          <hr/>
+          <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p>
+        </div>
+      `;
+      await sendEmail(customer.email, "Your FixHub Nepal Booking is Confirmed!", emailHtml);
     } catch (emailError) {
       console.error("Error sending COD confirmation email:", emailError);
     }
@@ -415,7 +427,7 @@ const confirmPayment = async (req: AuthRequest, res: Response): Promise<void> =>
 /**
  * Verifies a Khalti payment.
  */
-const verifyKhaltiPayment = async (req: AuthRequest, res: Response): Promise<void> => {
+export const verifyKhaltiPayment = async (req: AuthRequest, res: Response): Promise<void> => {
   const { token, amount, booking_id } = req.body;
   if (!token || !amount || !booking_id) {
     res.status(400).json({ success: false, message: "Missing payment verification details." });
@@ -451,24 +463,24 @@ const verifyKhaltiPayment = async (req: AuthRequest, res: Response): Promise<voi
       try {
         const customer = booking.customer as IUser;
         const emailHtml = `
-                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                        <div style="text-align: center; padding: 20px; background-color: #f8f8f8;">
-                            <img src="${SUCCESS_ICON_URL}" alt="Success Icon" style="width: 80px;"/>
-                            <h2 style="color: #2c3e50;">Payment Successful!</h2>
-                        </div>
-                        <div style="padding: 20px;">
-                            <p>Dear ${customer.fullName},</p>
-                            <p>Your payment for booking <strong>#${booking._id}</strong> has been successfully processed via Khalti.</p>
-                            <p>You have earned <strong>${points} loyalty points</strong> for this booking!</p>
-                            <p>Your appointment for <strong>${booking.serviceType}</strong> on <strong>${new Date(booking.date).toLocaleDateString()}</strong> is confirmed.</p>
-                            <p>Total Amount Paid: <strong>Rs. ${booking.finalAmount}</strong></p>
-                            <p>Thank you for choosing MotoFix!</p>
-                        </div>
-                        <hr/>
-                        <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p>
-                    </div>
-                `;
-        await sendEmail(customer.email, "Your MotoFix Booking is Confirmed!", emailHtml);
+          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="text-align: center; padding: 20px; background-color: #f8f8f8;">
+              <img src="${SUCCESS_ICON_URL}" alt="Success Icon" style="width: 80px;"/>
+              <h2 style="color: #2c3e50;">Payment Successful!</h2>
+            </div>
+            <div style="padding: 20px;">
+              <p>Dear ${customer.fullName},</p>
+              <p>Your payment for booking <strong>#${booking._id}</strong> has been successfully processed via Khalti.</p>
+              <p>You have earned <strong>${points} loyalty points</strong> for this booking!</p>
+              <p>Your appointment for <strong>${booking.serviceType}</strong> on <strong>${new Date(booking.date).toLocaleDateString()}</strong> is confirmed.</p>
+              <p>Total Amount Paid: <strong>Rs. ${booking.finalAmount}</strong></p>
+              <p>Thank you for choosing FixHub Nepal!</p>
+            </div>
+            <hr/>
+            <p style="font-size: 0.8em; color: #777; text-align: center;">This is an automated email. Please do not reply.</p>
+          </div>
+        `;
+        await sendEmail(customer.email, "Your FixHub Nepal Booking is Confirmed!", emailHtml);
       } catch (emailError) {
         console.error("Error sending Khalti success email:", emailError);
       }
@@ -484,9 +496,9 @@ const verifyKhaltiPayment = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 /**
- * Applies a 20% loyalty discount to a booking.
+ * Applies a loyalty discount to a booking.
  */
-const applyLoyaltyDiscount = async (req: AuthRequest, res: Response): Promise<void> => {
+export const applyLoyaltyDiscount = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const booking = await Booking.findById(req.params.id);
     const user = await User.findById(req.user.id);
@@ -501,36 +513,31 @@ const applyLoyaltyDiscount = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const discountValue = (booking.totalCost + booking.pickupDropoffCost) * 0.2;
-    booking.finalAmount = booking.totalCost + booking.pickupDropoffCost - discountValue;
+    const pointsToUse = Math.floor(user.loyaltyPoints / 100) * 100;
+    const discountPercent = 0.05 * (pointsToUse / 100);
+    if (discountPercent === 0) {
+      res.status(400).json({ success: false, message: "Not enough loyalty points for discount." });
+      return;
+    }
+
+    const baseAmount = booking.totalCost + (booking.pickupDropoffCost || 0);
+    const discountValue = baseAmount * discountPercent;
+    booking.finalAmount = baseAmount - discountValue;
     booking.discountApplied = true;
     booking.discountAmount = discountValue;
 
-    user.loyaltyPoints -= 100;
+    user.loyaltyPoints -= pointsToUse;
 
     await booking.save();
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: `20% discount applied! Your new total is ${booking.finalAmount}.`,
+      message: `Discount applied! Your new total is ${booking.finalAmount}.`,
       data: { booking, loyaltyPoints: user.loyaltyPoints },
     });
   } catch (error) {
     console.error("Error applying discount:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
-};
-
-export {
-  getUserBookings,
-  createBooking,
-  updateUserBooking,
-  deleteUserBooking,
-  confirmPayment,
-  verifyKhaltiPayment,
-  applyLoyaltyDiscount,
-  getUserBookingById,
-  getPendingBookings,
-  getBookingHistory,
 };
