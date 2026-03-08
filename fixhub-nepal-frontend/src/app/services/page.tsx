@@ -6,12 +6,14 @@ import Footer from "@/components/layout/Footer";
 import api from "@/lib/api";
 import { Service } from "@/types";
 import { Wrench, Search, Clock } from "lucide-react";
+import ServiceDetailsModal from "@/components/ServiceDetailsModal";
 import Link from "next/link";
 
 export default function PublicServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -92,7 +94,7 @@ export default function PublicServicesPage() {
                       )}
                     </div>
                     <p className="text-sm text-gray mb-4 line-clamp-2">{service.description}</p>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div>
                         <span className="text-lg font-bold text-primary">Rs. {service.price}</span>
                         {service.duration && (
@@ -101,6 +103,12 @@ export default function PublicServicesPage() {
                           </span>
                         )}
                       </div>
+                      <button
+                        className="bg-primary/10 text-primary px-4 py-2 rounded-lg text-sm hover:bg-primary/20 transition-colors border border-primary"
+                        onClick={() => setViewDetailsId(service._id)}
+                      >
+                        View Details
+                      </button>
                       <Link
                         href="/register"
                         className="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-dark transition-colors"
@@ -108,6 +116,7 @@ export default function PublicServicesPage() {
                         Book Now
                       </Link>
                     </div>
+
                   </div>
                 </div>
               ))}
@@ -122,6 +131,10 @@ export default function PublicServicesPage() {
         </div>
       </section>
 
+      {/* Service Details Modal (only one, at root) */}
+      {viewDetailsId && (
+        <ServiceDetailsModal serviceId={viewDetailsId} onClose={() => setViewDetailsId(null)} />
+      )}
       <Footer />
     </div>
   );
