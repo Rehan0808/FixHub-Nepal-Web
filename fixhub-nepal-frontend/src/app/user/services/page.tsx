@@ -61,7 +61,6 @@ export default function UserServices() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Using reverse geocoding API
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
@@ -95,7 +94,6 @@ export default function UserServices() {
     );
   };
 
-  // Geocode address to get coordinates
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     try {
       const response = await fetch(
@@ -133,9 +131,7 @@ export default function UserServices() {
         notes: bookingForm.description,
       };
 
-      // Add pickup/dropoff details if requested
       if (bookingForm.requestPickup) {
-        // Geocode addresses if coordinates are not set
         let pickupCoords = bookingForm.pickupCoordinates;
         let dropoffCoords = bookingForm.dropoffCoordinates;
 

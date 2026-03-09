@@ -46,11 +46,9 @@ export default function AdminChat() {
     socket.on("receive_message", (msg: ChatMessage) => {
       console.log(`[Admin Chat] Received message:`, msg);
       
-      // Check if message belongs to currently selected user's room
       const currentUser = selectedUserRef.current;
       if (currentUser && msg.room === `chat-${currentUser._id}`) {
         setMessages((prev) => {
-          // Avoid duplicates
           if (prev.some(m => m._id === msg._id)) {
             return prev;
           }
@@ -58,15 +56,12 @@ export default function AdminChat() {
         });
       }
       
-      // Update last message and timestamp in user list
       setUsers((prev) => {
-        // Update the user with the new message and move to top
         const updated = prev.map((u) =>
           msg.room === `chat-${u._id}`
             ? { ...u, lastMessage: msg.message, lastMessageTimestamp: msg.createdAt }
             : u
         );
-        // Find the user index
         const idx = updated.findIndex((u) => msg.room === `chat-${u._id}`);
         if (idx > -1) {
           const user = updated[idx];
@@ -82,7 +77,6 @@ export default function AdminChat() {
     };
   }, []);
 
-  // Keep ref in sync with selectedUser state
   useEffect(() => {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
@@ -116,7 +110,6 @@ export default function AdminChat() {
     if (socketRef.current) {
       socketRef.current.emit("join_room", { roomName, userId: "admin_user" });
       
-      // Remove previous listener to avoid duplicates
       socketRef.current.off("chat_history");
       
       socketRef.current.on("chat_history", (history: ChatMessage[]) => {
@@ -162,7 +155,6 @@ export default function AdminChat() {
       u.email.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
-      // Sort by lastMessageTimestamp descending
       const aTime = a.lastMessageTimestamp ? new Date(a.lastMessageTimestamp).getTime() : 0;
       const bTime = b.lastMessageTimestamp ? new Date(b.lastMessageTimestamp).getTime() : 0;
       return bTime - aTime;

@@ -17,7 +17,6 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const socket = useSocket(user?._id || user?.id || user?.email);
-  // Fetch notifications
   useEffect(() => {
     if (!user) return;
     api.get("/notifications").then(res => {
@@ -26,7 +25,6 @@ export default function Navbar() {
     });
   }, [user]);
 
-  // Listen for real-time notifications
   useEffect(() => {
     if (!socket) return;
     socket.on("notification", (notif: any) => {
@@ -38,7 +36,6 @@ export default function Navbar() {
     };
   }, [socket]);
 
-  // Mark all as read when opening dropdown
   const handleNotifOpen = async () => {
     setNotifOpen(!notifOpen);
     if (!notifOpen && unreadCount > 0) {

@@ -31,7 +31,6 @@ export default function UserBookings() {
   const [editForm, setEditForm] = useState<any>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // Fetch bookings
   const fetchBookings = async () => {
     try {
       const res = await api.get("/user/bookings");
@@ -47,7 +46,6 @@ export default function UserBookings() {
     fetchBookings();
   }, []);
 
-  // Initialize edit form
   useEffect(() => {
     if (editingBooking) {
       const [vehicleName, vehicleNumber] =
@@ -71,7 +69,6 @@ export default function UserBookings() {
     }
   }, [editingBooking]);
 
-  // Edit booking
   const handleEditBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -107,7 +104,6 @@ export default function UserBookings() {
     }
   };
 
-  // Cancel booking
   const cancelBooking = async (id: string) => {
     if (!window.confirm("Cancel this booking?")) return;
     try {
@@ -119,7 +115,6 @@ export default function UserBookings() {
     }
   };
 
-  // Delete booking
   const deleteBooking = async (id: string) => {
     if (!window.confirm("Delete this booking permanently?")) return;
     try {
@@ -131,7 +126,6 @@ export default function UserBookings() {
     }
   };
 
-  // Status badge
   const statusVariant = (status: string) => {
     const map: any = {
       Completed: "success",

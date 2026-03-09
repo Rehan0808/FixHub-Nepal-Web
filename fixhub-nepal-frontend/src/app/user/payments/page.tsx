@@ -11,14 +11,11 @@ export default function UserPayments() {
   const [loading, setLoading] = useState(true);
   const { user, updateUser } = useAuth();
   const [discountLoading, setDiscountLoading] = useState<string | null>(null);
-  // Handler for Apply Discount button
   const handleApplyDiscount = async (payment: Booking) => {
     setDiscountLoading(payment._id);
     try {
       const res = await api.put(`/user/bookings/${payment._id}/apply-discount`);
-      // Update the payment in the list
       setPayments((prev) => prev.map((b) => b._id === payment._id ? { ...b, ...res.data.data.booking } : b));
-      // Update user loyalty points
       if (user) updateUser({ ...user, loyaltyPoints: res.data.data.loyaltyPoints });
     } catch (err: any) {
       alert(err?.response?.data?.message || "Failed to apply discount");
@@ -45,24 +42,19 @@ export default function UserPayments() {
     fetchPaymentsAndUser();
   }, []);
 
-  // Separate pending and paid payments
   const pendingPayments = payments.filter((p) => !p.isPaid);
 
 
-  // Handler for Pay Now button (eSewa)
   const handlePayNow = async (payment: Booking) => {
     try {
-      // Call backend to get eSewa payment data
       const res = await api.post("/payment/esewa/initiate", {
         bookingId: payment._id,
         frontendUrl: window.location.origin,
       });
       const data = res.data;
-      // Create and submit a form to eSewa
       const form = document.createElement("form");
       form.method = "POST";
       form.action = data.ESEWA_URL;
-      // Add all fields from backend response except ESEWA_URL
       Object.entries(data).forEach(([key, value]) => {
         if (key === "ESEWA_URL") return;
         const input = document.createElement("input");

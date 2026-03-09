@@ -15,15 +15,11 @@ export function useSocket(userId?: string) {
       });
     }
     socketRef.current = socket;
-    // Join personal room for notifications
     socket.emit("join_room", { roomName: `chat-${userId}`, userId });
-    // Optionally join admin notification room
     if (userId === "admin_user") {
       socket.emit("join_room", { roomName: "admin_notifications", userId });
     }
-    return () => {
-      // socket.disconnect(); // Don't disconnect globally if shared
-    };
+    return () => {};
   }, [userId]);
 
   return socketRef.current;

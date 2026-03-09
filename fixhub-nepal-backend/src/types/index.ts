@@ -1,10 +1,6 @@
 import { Document, Types } from "mongoose";
 import { Request } from "express";
 
-// ==========================================
-// Mongoose Document Interfaces
-// ==========================================
-
 export interface IUser extends Document {
   _id: Types.ObjectId;
   fullName: string;
@@ -112,18 +108,10 @@ export interface IWorkshop extends Document {
   updatedAt: Date;
 }
 
-// ==========================================
-// Express Request Extensions
-// ==========================================
-
 /** Authenticated request — `req.user` is guaranteed after auth middleware */
 export interface AuthRequest extends Request {
   user: IUser;
 }
-
-// ==========================================
-// JWT Payload
-// ==========================================
 
 export interface JwtPayload {
   _id: string;
@@ -139,10 +127,6 @@ export interface ResetJwtPayload {
   iat?: number;
   exp?: number;
 }
-
-// ==========================================
-// API Responses (common shapes)
-// ==========================================
 
 export interface ApiResponse<T = unknown> {
   success: boolean;

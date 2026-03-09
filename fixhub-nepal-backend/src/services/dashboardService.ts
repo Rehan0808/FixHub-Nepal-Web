@@ -21,24 +21,19 @@ export interface DashboardStats {
 export class DashboardService {
     async getDashboardStats(userId?: string): Promise<DashboardStats> {
         try {
-            // Total bookings
             const totalBookings = await prisma.booking.count();
 
-            // Total revenue
             const revenueData = await prisma.booking.aggregate({
-                where: { status: 'COMPLETED' },  // ✅ Changed to uppercase
+                where: { status: 'COMPLETED' },
                 _sum: { totalPrice: true }
             });
 
-            // Active services
             const activeServices = await prisma.service.count({
                 where: { isActive: true }
             });
 
-            // Total users
             const totalUsers = await prisma.user.count();
 
-            // Recent bookings (last 10)
             const recentBookings = await prisma.booking.findMany({
                 take: 10,
                 orderBy: { createdAt: 'desc' },
@@ -48,7 +43,6 @@ export class DashboardService {
                 }
             });
 
-            // Booking status breakdown
             const bookingsByStatus = await prisma.booking.groupBy({
                 by: ['status'],
                 _count: true
@@ -60,8 +54,6 @@ export class DashboardService {
                 completed: 0,
                 cancelled: 0
             };
-
-            // ✅ Fixed the mapping to use lowercase keys
             bookingsByStatus.forEach((item: { status: string; _count: number }) => {
                 const statusKey = item.status.toLowerCase() as keyof typeof bookingStatusBreakdown;
                 if (statusKey in bookingStatusBreakdown) {
@@ -75,7 +67,7 @@ export class DashboardService {
 
             const monthlyBookings = await prisma.booking.findMany({
                 where: {
-                    status: 'COMPLETED',  // ✅ Changed to uppercase
+                    status: 'COMPLETED',
                     createdAt: { gte: sixMonthsAgo }
                 },
                 select: { totalPrice: true, createdAt: true }
